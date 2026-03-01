@@ -1,0 +1,24 @@
+Multi-Agent Grounded RAG System
+
+The Multi-Agent Grounded RAG System uses six specialized agents to reduce hallucinations in LLM responses.
+
+Agent 1: Retriever Agent
+The Retriever Agent runs hybrid search combining BM25 keyword search and dense vector search. Results are merged using Reciprocal Rank Fusion (RRF). This catches both exact-match queries (e.g., product codes) and semantic queries.
+
+Agent 2: Reranker Agent
+The Reranker Agent uses a cross-encoder to re-rank the top-K chunks from retrieval. It returns only the top-N most relevant chunks. Cross-encoders are slower but more accurate than bi-encoders.
+
+Agent 3: Answer Generator
+The Answer Generator produces responses using ONLY the provided evidence chunks. Every factual claim must cite a source chunk inline using [1], [2], etc. Temperature is set to 0 for deterministic output.
+
+Agent 4: Claim Decomposer
+The Claim Decomposer breaks the generated answer into atomic claims. Each claim is a single, independently verifiable fact. NLI models work best on short, single-fact statements.
+
+Agent 5: Verification Agent
+The Verification Agent runs each atomic claim through a Natural Language Inference (NLI) model against each evidence chunk. Verdicts are SUPPORTED, CONTRADICTED, or UNVERIFIED.
+
+Agent 6: Confidence Agent
+The Confidence Agent computes the support ratio: SUPPORTED claims / total claims. If the ratio is below 0.70, it triggers re-retrieval. After 2 retries, it returns a structured refusal instead of a hallucinated answer.
+
+Structured Refusal
+When evidence is insufficient, the system returns a JSON with: the original query, confidence score, list of unverified claims, evidence found, and a plain-language explanation. This is the key safety feature for high-stakes domains.

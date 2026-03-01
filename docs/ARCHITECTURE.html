@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture — Multi-Agent Grounded RAG</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.6; color: #1a1a1a; }
+        h1 { font-size: 1.75rem; border-bottom: 2px solid #3b82f6; padding-bottom: 0.5rem; }
+        h2 { font-size: 1.25rem; margin-top: 2rem; color: #1e40af; }
+        table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+        th, td { border: 1px solid #cbd5e1; padding: 0.5rem 0.75rem; text-align: left; }
+        th { background: #f1f5f9; font-weight: 600; }
+        pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: 0.85rem; }
+        code { background: #f1f5f9; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+        .back { margin-bottom: 1rem; }
+        .back a { color: #3b82f6; text-decoration: none; }
+        .back a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <p class="back"><a href="../">← Back to project</a> · <a href="PROJECT_FLOW.html">Project Flow</a></p>
+    <h1>Multi-Agent Grounded RAG — Architecture</h1>
+
+    <h2>Pipeline Flow</h2>
+    <pre>┌─────────────┐
+│ User Query  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 1. RETRIEVER AGENT                                      │
+│    Hybrid: BM25 + Dense vectors → Reciprocal Rank Fusion│
+│    Output: top-K chunks                                  │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 2. RERANKER AGENT                                       │
+│    Cross-encoder (ms-marco-MiniLM)                       │
+│    Output: top-N evidence chunks                         │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 3. ANSWER GENERATOR                                     │
+│    GPT-4 / Mistral — citation-enforced prompt             │
+│    Output: Answer with [1], [2] citations                │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 4. CLAIM DECOMPOSER                                     │
+│    LLM — atomic claim extraction                         │
+│    Output: JSON array of verifiable claims               │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 5. VERIFICATION AGENT                                   │
+│    DeBERTa-v3 NLI — per claim vs evidence                 │
+│    Output: SUPPORTED | CONTRADICTED | UNVERIFIED          │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 6. CONFIDENCE AGENT                                     │
+│    Support ratio = SUPPORTED / total                      │
+│    If &lt; 0.70: re-retrieve (max 2x) or REFUSE              │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ├── ratio ≥ 0.70 ──► Verified Answer + confidence_score
+       │
+       └── ratio &lt; 0.70, retries exhausted ──► Structured Refusal</pre>
+
+    <h2>Re-Retrieval Loop</h2>
+    <pre>Support Ratio &lt; 0.70?
+       │
+       ├── Yes, retries &lt; 2 ──► Re-run Retriever (targeted query) ──► back to Reranker
+       │
+       └── Yes, retries = 2 ──► Structured Refusal</pre>
+
+    <h2>Structured Refusal Format</h2>
+    <pre>{
+  "status": "refused",
+  "query": "...",
+  "confidence_score": 0.45,
+  "unverified_claims": ["..."],
+  "evidence_found": ["..."],
+  "refusal_reason": "max_retries_exceeded",
+  "explanation": "Maximum re-retrieval attempts reached..."
+}</pre>
+
+    <h2>Data Flow</h2>
+    <table>
+        <tr><th>Stage</th><th>Input</th><th>Output</th></tr>
+        <tr><td>Retriever</td><td>query</td><td>List[str] chunks</td></tr>
+        <tr><td>Reranker</td><td>query, chunks</td><td>List[str] top-N</td></tr>
+        <tr><td>Generator</td><td>query, evidence</td><td>str answer</td></tr>
+        <tr><td>Decomposer</td><td>answer</td><td>List[str] claims</td></tr>
+        <tr><td>Verifier</td><td>claims, evidence</td><td>List[(Verdict, chunk)]</td></tr>
+        <tr><td>Confidence</td><td>verdicts</td><td>float ratio, decision</td></tr>
+    </table>
+</body>
+</html>

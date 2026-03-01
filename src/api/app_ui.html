@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG — Upload, Index, Query</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(160deg, #0c0c1a 0%, #1a1a2e 40%, #16213e 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            padding: 2rem;
+        }
+        .wrap { max-width: 640px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #f8fafc; }
+        .sub { color: #94a3b8; font-size: 0.9rem; margin-bottom: 2rem; }
+        .step {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .step h2 {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #38bdf8;
+            margin-bottom: 1rem;
+        }
+        .step.done h2 { color: #34d399; }
+        .step.error h2 { color: #f87171; }
+        .zone {
+            border: 2px dashed rgba(148, 163, 184, 0.4);
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .zone:hover, .zone.dragover { border-color: #38bdf8; background: rgba(56, 189, 248, 0.08); }
+        .zone input { display: none; }
+        .zone p { color: #94a3b8; font-size: 0.9rem; margin-top: 0.5rem; }
+        .btn {
+            display: inline-block;
+            padding: 0.6rem 1.25rem;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn.green { background: linear-gradient(135deg, #10b981, #059669); }
+        .btn.green:hover { box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4); }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 0.75rem 1rem;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+            margin-bottom: 0.75rem;
+        }
+        .out {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(15, 23, 42, 0.95);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+        .msg { font-size: 0.85rem; margin-top: 0.5rem; }
+        .msg.ok { color: #34d399; }
+        .msg.err { color: #f87171; }
+        .msg.muted { color: #64748b; }
+        .back { margin-bottom: 1rem; }
+        .back a { color: #94a3b8; text-decoration: none; font-size: 0.9rem; }
+        .back a:hover { color: #38bdf8; }
+        .scores { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .score-box {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            min-width: 120px;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .score-box.confidence { background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.5); }
+        .score-box.confidence.high { background: rgba(16, 185, 129, 0.18); border-color: rgba(16, 185, 129, 0.7); }
+        .score-box.confidence.medium { background: rgba(234, 179, 8, 0.18); border-color: rgba(234, 179, 8, 0.7); }
+        .score-box.confidence.low { background: rgba(248, 113, 113, 0.16); border-color: rgba(248, 113, 113, 0.7); }
+        .score-box.hallucination { background: rgba(248, 113, 113, 0.15); border: 1px solid rgba(248, 113, 113, 0.35); }
+        .score-box .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 0.25rem; }
+        .score-box .value { font-size: 1.25rem; font-weight: 700; }
+        .score-box.confidence .value { color: #34d399; }
+        .score-box.hallucination .value { color: #f87171; }
+        .score-change { font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem; }
+        .score-change.better { color: #34d399; }
+        .score-change.worse { color: #f87171; }
+        .answer-block { background: rgba(15, 23, 42, 0.95); border-radius: 8px; padding: 1rem; margin-top: 0.75rem; white-space: pre-wrap; font-size: 0.9rem; max-height: 200px; overflow-y: auto; }
+        .reduce-section { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(100, 116, 139, 0.3); }
+        .reduce-section summary { cursor: pointer; font-weight: 600; color: #38bdf8; }
+        .reduce-section ul { margin: 0.5rem 0 0 1.25rem; color: #94a3b8; font-size: 0.85rem; line-height: 1.6; }
+        .raw-toggle { margin-top: 0.5rem; font-size: 0.8rem; }
+        .raw-toggle a { color: #64748b; text-decoration: none; }
+        .raw-toggle a:hover { color: #38bdf8; }
+        .aim-banner {
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            color: #e2e8f0;
+            margin-bottom: 1.5rem;
+        }
+        .aim-banner strong { color: #38bdf8; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <p class="back"><a href="/">← Home</a></p>
+        <h1>Multi-Agent Grounded RAG</h1>
+        <p class="sub">Upload documents → Build index → Ask questions. All steps here.</p>
+        <div class="aim-banner">
+            <strong>Our aim: reduce hallucination.</strong> Get an initial hallucination score → perform operations (add docs, re-index, ask specific questions) → run queries again and see the score go down.
+        </div>
+
+        <!-- Step 1: Upload -->
+        <div class="step" id="step1">
+            <h2>Step 1 — Upload documents</h2>
+            <div class="zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" multiple accept=".pdf,.txt,.md,.csv">
+                <strong>Drop files here or click to choose</strong>
+                <p>PDF, TXT, MD, or CSV</p>
+            </div>
+            <p class="msg muted" id="uploadMsg">No files selected</p>
+            <button class="btn" id="uploadBtn" onclick="uploadFiles()" style="margin-top: 0.75rem;">Upload files</button>
+            <p class="msg" id="uploadResult"></p>
+        </div>
+
+        <!-- Step 2: Index -->
+        <div class="step" id="step2">
+            <h2>Step 2 — Build index</h2>
+            <p class="msg muted" id="indexHint">After uploading, build the search index (1–2 min).</p>
+            <button class="btn" id="indexBtn" onclick="runIndex()">Build index</button>
+            <p class="msg" id="indexResult"></p>
+        </div>
+
+        <!-- Step 3: Query -->
+        <div class="step" id="step3">
+            <h2>Step 3 — Ask a question</h2>
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem; flex-wrap:wrap;">
+                <span class="msg muted" style="margin-top:0;">Mode:</span>
+                <select id="modeSelect" style="background:rgba(15,23,42,0.9); border:1px solid rgba(148,163,184,0.4); border-radius:6px; padding:0.35rem 0.6rem; color:#e2e8f0; font-size:0.85rem;">
+                    <option value="multi">Verified Multi-Agent RAG</option>
+                    <option value="rag">Standard RAG</option>
+                    <option value="naive">Naive LLM</option>
+                </select>
+                <button class="btn" type="button" id="compareBtn" onclick="compareModes()" style="margin-left:auto;">Compare modes</button>
+            </div>
+            <textarea id="queryInput" placeholder="e.g. What does the Retriever Agent do?">What does the Retriever Agent do?</textarea>
+            <button class="btn green" id="queryBtn" onclick="runQuery()">Run query</button>
+            <div id="resultPanel" style="display: none;">
+                <div class="scores" id="scoresRow">
+                    <div class="score-box confidence"><div class="label">Confidence</div><div class="value" id="confVal">—</div></div>
+                    <div class="score-box hallucination"><div class="label">Hallucination score</div><div class="value" id="hallVal">—</div><div class="score-change" id="hallChange"></div></div>
+                </div>
+                <div id="answerBlock" class="answer-block"></div>
+                <div id="metaLine" class="msg muted" style="margin-top: 0.5rem;"></div>
+                <div id="claimsSection" class="out" style="margin-top: 0.75rem; max-height: 220px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">
+                    <!-- Claim breakdown table will be injected here -->
+                </div>
+                <div class="dev-section" style="margin-top: 0.75rem;">
+                    <details>
+                        <summary style="cursor: pointer; font-weight: 600; color: #38bdf8;">Developer details (full JSON)</summary>
+                        <pre class="out" id="queryOut" style="margin-top: 0.5rem;"></pre>
+                    </details>
+                </div>
+                <div id="comparePanel" style="margin-top: 1rem; display:none;">
+                    <p class="msg muted" style="margin-bottom:0.35rem;">Mode comparison (hallucination risk — lower is better)</p>
+                    <div id="compareBars" style="font-size:0.8rem;"></div>
+                </div>
+            </div>
+            <div class="reduce-section">
+                <details open>
+                    <summary>Operations to reduce hallucination (score goes down)</summary>
+                    <ul>
+                        <li><strong>1. Add more documents</strong> — Upload in Step 1, then re-build index in Step 2. More evidence → lower hallucination score.</li>
+                        <li><strong>2. Re-build index</strong> — After adding/editing files, run Step 2 again so new content is searchable.</li>
+                        <li><strong>3. Ask specific questions</strong> — Phrase queries to match terms in your docs. Vague questions → higher score.</li>
+                        <li><strong>4. Compare Previous → Current</strong> — Run a query, apply an operation, run again; the UI shows if the score improved.</li>
+                        <li><strong>5. Trust refusals</strong> — When the system refuses (high hallucination score), it means evidence was insufficient; avoid rephrasing to “force” an answer.</li>
+                        <li><strong>Check unverified claims</strong> — In refusals, review “unverified_claims” and add source documents that support those facts.</li>
+                    </ul>
+                </details>
+            </div>
+        </div>
+    </div>
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const uploadMsg = document.getElementById('uploadMsg');
+        const uploadResult = document.getElementById('uploadResult');
+        const indexHint = document.getElementById('indexHint');
+        const indexResult = document.getElementById('indexResult');
+        const indexBtn = document.getElementById('indexBtn');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+            dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); });
+        });
+        dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', e => {
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(new Event('change'));
+        });
+        fileInput.addEventListener('change', () => {
+            const n = fileInput.files.length;
+            uploadMsg.textContent = n ? n + ' file(s) selected' : 'No files selected';
+        });
+
+        async function uploadFiles() {
+            if (!fileInput.files.length) {
+                uploadResult.textContent = 'Select files first.';
+                uploadResult.className = 'msg err';
+                return;
+            }
+            uploadResult.textContent = 'Uploading...';
+            uploadResult.className = 'msg';
+            const form = new FormData();
+            for (const f of fileInput.files) form.append('files', f);
+            try {
+                const r = await fetch('/api/upload', { method: 'POST', body: form });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || 'Upload failed');
+                uploadResult.textContent = 'Uploaded: ' + (d.uploaded || []).join(', ');
+                uploadResult.className = 'msg ok';
+            } catch (e) {
+                uploadResult.textContent = e.message;
+                uploadResult.className = 'msg err';
+            }
+        }
+
+        async function runIndex() {
+            indexResult.textContent = 'Building index... (1–2 min)';
+            indexResult.className = 'msg';
+            indexBtn.disabled = true;
+            try {
+                const r = await fetch('/api/index', { method: 'POST' });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || 'Index failed');
+                indexResult.textContent = (d.message || 'Done') + ' — ' + (d.chunks || 0) + ' chunks.';
+                indexResult.className = 'msg ok';
+                document.getElementById('step2').classList.add('done');
+            } catch (e) {
+                indexResult.textContent = e.message;
+                indexResult.className = 'msg err';
+            }
+            indexBtn.disabled = false;
+        }
+
+        let lastHallucinationScore = null;
+        const history = [];
+
+        function showResult(d) {
+            const panel = document.getElementById('resultPanel');
+            const confVal = document.getElementById('confVal');
+            const confBox = confVal.parentElement.parentElement;
+            const hallVal = document.getElementById('hallVal');
+            const hallChange = document.getElementById('hallChange');
+            const answerBlock = document.getElementById('answerBlock');
+            const out = document.getElementById('queryOut');
+            const metaLine = document.getElementById('metaLine');
+            const claimsSection = document.getElementById('claimsSection');
+
+            const conf = d.confidence_score != null ? d.confidence_score : (d.status === 'verified' ? 1 : 0);
+            const hall = d.hallucination_score != null ? d.hallucination_score : (1 - conf);
+            confVal.textContent = (conf * 100).toFixed(0) + '%';
+            hallVal.textContent = (hall * 100).toFixed(0) + '%';
+
+            // Color confidence card based on thresholds
+            confBox.className = 'score-box confidence';
+            if (conf > 0.8) {
+                confBox.classList.add('high');
+            } else if (conf >= 0.6) {
+                confBox.classList.add('medium');
+            } else {
+                confBox.classList.add('low');
+            }
+
+            if (lastHallucinationScore != null) {
+                const diff = hall - lastHallucinationScore;
+                const dir = diff < 0 ? 'better' : diff > 0 ? 'worse' : '';
+                hallChange.textContent = 'Previous: ' + (lastHallucinationScore * 100).toFixed(0) + '% → ' + (hall * 100).toFixed(0) + '%';
+                hallChange.className = 'score-change ' + (diff < 0 ? 'better' : diff > 0 ? 'worse' : '');
+            } else {
+                hallChange.textContent = '';
+                hallChange.className = 'score-change';
+            }
+            lastHallucinationScore = hall;
+
+            const answer = d.answer || d.refusal_reason || d.explanation || '(No answer text)';
+            answerBlock.textContent = answer;
+
+            // Meta info: retries, re-retrieval, total latency
+            const retries = d.retries != null ? d.retries : 0;
+            const reRet = d.re_retrieval_triggered ? 'Yes' : 'No';
+            const totalLatency = d.total_latency != null ? (d.total_latency).toFixed(2) + ' s' : '—';
+            metaLine.textContent = `Re-retrieval triggered: ${reRet} · Retries: ${retries} · Total latency: ${totalLatency}`;
+
+            // Claim breakdown table
+            const claims = d.claims || [];
+            const verdicts = d.verdicts || [];
+            const evid = d.claim_evidence || [];
+            if (claims.length) {
+                let html = '<table style="width:100%; border-collapse:collapse;">';
+                html += '<thead><tr><th style="text-align:left; padding:4px; border-bottom:1px solid #1f2933;">Claim</th><th style="text-align:left; padding:4px; border-bottom:1px solid #1f2933;">Verdict</th><th style="text-align:left; padding:4px; border-bottom:1px solid #1f2933;">Evidence snippet</th></tr></thead><tbody>';
+                for (let i = 0; i < claims.length; i++) {
+                    const v = verdicts[i] || '';
+                    const ev = evid[i] || '';
+                    const color = v === 'SUPPORTED' ? '#34d399' : (v === 'CONTRADICTED' ? '#f87171' : '#eab308');
+                    html += `<tr><td style="padding:4px 4px 4px 0.25rem; vertical-align:top;">${claims[i]}</td><td style="padding:4px; color:${color}; font-weight:600;">${v}</td><td style="padding:4px; color:#9ca3af;">${ev ? ev.slice(0, 160) + (ev.length > 160 ? '…' : '') : ''}</td></tr>`;
+                }
+                html += '</tbody></table>';
+                claimsSection.innerHTML = html;
+            } else {
+                claimsSection.innerHTML = '(No decomposed claims returned.)';
+            }
+
+            out.textContent = JSON.stringify(d, null, 2);
+            panel.style.display = 'block';
+
+            // Push into history for potential trend display
+            history.push({
+                mode: d.status || 'multi',
+                hallucination: hall,
+                confidence: conf,
+                query: document.getElementById('queryInput').value.trim(),
+            });
+        }
+
+        async function runQuery() {
+            const q = document.getElementById('queryInput').value.trim();
+            const out = document.getElementById('queryOut');
+            const btn = document.getElementById('queryBtn');
+            const answerBlock = document.getElementById('answerBlock');
+            const mode = document.getElementById('modeSelect').value || 'multi';
+            if (!q) return;
+            btn.disabled = true;
+            answerBlock.textContent = 'Running... (first query may take 1–2 min)';
+            document.getElementById('resultPanel').style.display = 'block';
+            try {
+                const r = await fetch('/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: q, mode })
+                });
+                const d = await r.json();
+                showResult(d);
+            } catch (e) {
+                answerBlock.textContent = 'Error: ' + e.message;
+            }
+            btn.disabled = false;
+        }
+
+        async function compareModes() {
+            const q = document.getElementById('queryInput').value.trim();
+            const answerBlock = document.getElementById('answerBlock');
+            const panel = document.getElementById('resultPanel');
+            if (!q) return;
+            const modes = ['naive', 'rag', 'multi'];
+            const labels = {
+                naive: 'Naive LLM',
+                rag: 'Standard RAG',
+                multi: 'Verified Multi-Agent RAG',
+            };
+            const results = {};
+            answerBlock.textContent = 'Running comparison across modes...';
+            panel.style.display = 'block';
+            for (const m of modes) {
+                try {
+                    const r = await fetch('/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: q, mode: m })
+                    });
+                    const d = await r.json();
+                    results[m] = d;
+                } catch (e) {
+                    // If one mode fails, skip it
+                }
+            }
+            // Use multi-agent result to populate main trust report if available.
+            if (results.multi) {
+                showResult(results.multi);
+            } else if (results.rag) {
+                showResult(results.rag);
+            } else if (results.naive) {
+                showResult(results.naive);
+            }
+
+            const comparePanel = document.getElementById('comparePanel');
+            const compareBars = document.getElementById('compareBars');
+            let html = '';
+            const maxWidth = 220;
+            modes.forEach((m) => {
+                const d = results[m];
+                if (!d) return;
+                const hall = d.hallucination_score != null ? d.hallucination_score : 1 - (d.confidence_score || 0);
+                const perc = Math.round(hall * 100);
+                const width = Math.max(4, Math.min(maxWidth, Math.round(maxWidth * hall)));
+                const color = hall < 0.2 ? '#22c55e' : hall < 0.4 ? '#eab308' : '#f97316';
+                html += `<div style="margin-bottom:4px;">${labels[m]} — ${perc}%</div>`;
+                html += `<div style="background:rgba(15,23,42,0.9); border-radius:999px; overflow:hidden; margin-bottom:8px;"><div style="width:${width}px; height:10px; background:${color};"></div></div>`;
+            });
+            compareBars.innerHTML = html || 'No results.';
+            comparePanel.style.display = html ? 'block' : 'none';
+        }
+
+        // Load status on page load
+        fetch('/api/status').then(r => r.json()).then(d => {
+            if (d.documents_count > 0) {
+                uploadMsg.textContent = d.documents_count + ' file(s) in folder: ' + (d.documents || []).join(', ');
+            }
+            if (d.index_exists) {
+                indexHint.textContent = 'Index already exists. Re-build after uploading new documents.';
+                document.getElementById('step2').classList.add('done');
+            }
+        }).catch(() => {});
+    </script>
+</body>
+</html>

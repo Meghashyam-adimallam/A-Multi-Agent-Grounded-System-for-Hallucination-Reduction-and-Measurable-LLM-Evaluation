@@ -1,0 +1,50 @@
+[
+  {
+    "id": "q1",
+    "query": "What does the Retriever Agent do?",
+    "expected_answerable": true,
+    "expected_topics": ["BM25", "dense", "hybrid", "RRF", "Reciprocal Rank Fusion"]
+  },
+  {
+    "id": "q2",
+    "query": "What is the support ratio formula?",
+    "expected_answerable": true,
+    "expected_topics": ["SUPPORTED", "total claims", "confidence"]
+  },
+  {
+    "id": "q3",
+    "query": "When does the system return a structured refusal?",
+    "expected_answerable": true,
+    "expected_topics": ["insufficient", "evidence", "refusal", "retries"]
+  },
+  {
+    "id": "q4",
+    "query": "What does the Claim Decomposer do?",
+    "expected_answerable": true,
+    "expected_topics": ["atomic", "claims", "verifiable"]
+  },
+  {
+    "id": "q5",
+    "query": "What is the default confidence threshold?",
+    "expected_answerable": true,
+    "expected_topics": ["0.70", "70"]
+  },
+  {
+    "id": "q6",
+    "query": "What does the Verification Agent use for NLI?",
+    "expected_answerable": true,
+    "expected_topics": ["DeBERTa", "NLI", "SUPPORTED", "CONTRADICTED", "UNVERIFIED"]
+  },
+  {
+    "id": "q7",
+    "query": "What is the capital of Mars?",
+    "expected_answerable": false,
+    "expected_topics": []
+  },
+  {
+    "id": "q8",
+    "query": "How many agents are in the pipeline?",
+    "expected_answerable": true,
+    "expected_topics": ["six", "6"]
+  }
+]

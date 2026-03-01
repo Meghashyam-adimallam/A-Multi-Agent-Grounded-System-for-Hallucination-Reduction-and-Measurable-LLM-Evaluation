@@ -1,0 +1,90 @@
+# Multi-Agent Grounded RAG — Architecture
+
+## Pipeline Flow
+
+```
+┌─────────────┐
+│ User Query  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 1. RETRIEVER AGENT                                      │
+│    Hybrid: BM25 + Dense vectors → Reciprocal Rank Fusion│
+│    Output: top-K chunks                                 │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 2. RERANKER AGENT                                       │
+│    Cross-encoder (ms-marco-MiniLM)                      │
+│    Output: top-N evidence chunks                        │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 3. ANSWER GENERATOR                                     │
+│    GPT-4 / Mistral — citation-enforced prompt           │
+│    Output: Answer with [1], [2] citations               │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 4. CLAIM DECOMPOSER                                     │
+│    LLM — atomic claim extraction                        │
+│    Output: JSON array of verifiable claims              │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 5. VERIFICATION AGENT                                   │
+│    DeBERTa-v3 NLI — per claim vs evidence               │
+│    Output: SUPPORTED | CONTRADICTED | UNVERIFIED        │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│ 6. CONFIDENCE AGENT                                     │
+│    Support ratio = SUPPORTED / total                    │
+│    If < 0.70: re-retrieve (max 2x) or REFUSE            │
+└──────┬──────────────────────────────────────────────────┘
+       │
+       ├── ratio ≥ 0.70 ──► Verified Answer + confidence_score
+       │
+       └── ratio < 0.70, retries exhausted ──► Structured Refusal
+```
+
+## Re-Retrieval Loop
+
+```
+Support Ratio < 0.70?
+       │
+       ├── Yes, retries < 2 ──► Re-run Retriever (targeted query) ──► back to Reranker
+       │
+       └── Yes, retries = 2 ──► Structured Refusal
+```
+
+## Structured Refusal Format
+
+```json
+{
+  "status": "refused",
+  "query": "...",
+  "confidence_score": 0.45,
+  "unverified_claims": ["..."],
+  "evidence_found": ["..."],
+  "refusal_reason": "max_retries_exceeded",
+  "explanation": "Maximum re-retrieval attempts reached..."
+}
+```
+
+## Data Flow
+
+| Stage | Input | Output |
+|-------|-------|--------|
+| Retriever | query | List[str] chunks |
+| Reranker | query, chunks | List[str] top-N |
+| Generator | query, evidence | str answer |
+| Decomposer | answer | List[str] claims |
+| Verifier | claims, evidence | List[(Verdict, chunk)] |
+| Confidence | verdicts | float ratio, decision |

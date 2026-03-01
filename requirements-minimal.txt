@@ -1,0 +1,17 @@
+# Minimal deps — install torch first: pip install torch --index-url https://download.pytorch.org/whl/cpu
+sentence-transformers
+faiss-cpu
+rank_bm25
+pypdf
+langchain
+langchain-community
+langchain-openai
+langchain-text-splitters
+langchain-core
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+python-dotenv
+numpy
+tqdm

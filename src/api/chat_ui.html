@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Adaptive Verified RAG Chatbot</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at top, #1f2937 0%, #020617 55%, #000 100%);
+            color: #e5e7eb;
+            min-height: 100vh;
+        }
+        .page {
+            display: flex;
+            min-height: 100vh;
+            height: auto;           /* allow full page to grow */
+            width: 100%;
+            overflow-y: auto;       /* enable scrolling when metrics are open */
+            overflow-x: hidden;
+        }
+        .sidebar {
+            width: 280px;
+            border-right: 1px solid rgba(148, 163, 184, 0.25);
+            background: rgba(15, 23, 42, 0.98);
+            padding: 1.5rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+        .logo {
+            font-size: 1.15rem;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+        .logo span:nth-child(2) {
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+        .section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #9ca3af;
+            margin-bottom: 0.35rem;
+        }
+        .card {
+            background: rgba(15, 23, 42, 0.95);
+            border-radius: 0.75rem;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            padding: 0.75rem 0.85rem;
+            font-size: 0.85rem;
+        }
+        .upload-zone {
+            border: 1px dashed rgba(148, 163, 184, 0.6);
+            border-radius: 0.6rem;
+            padding: 0.9rem;
+            text-align: center;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+        .upload-zone strong { display: block; margin-bottom: 0.25rem; color: #e5e7eb; }
+        .upload-zone input { display: none; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 0.9rem;
+            border-radius: 0.55rem;
+            border: none;
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            color: #e5e7eb;
+            background: linear-gradient(135deg, #4f46e5, #22c55e);
+            transition: transform 0.1s, box-shadow 0.1s, opacity 0.1s;
+        }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(59, 130, 246, 0.5); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn.secondary {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.5);
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.22rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .badge-naive { background: rgba(59, 130, 246, 0.2); color: #bfdbfe; border: 1px solid rgba(59, 130, 246, 0.7); }
+        .badge-rag { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.7); }
+        .badge-verified { background: rgba(22, 163, 74, 0.2); color: #bbf7d0; border: 1px solid rgba(22, 163, 74, 0.85); }
+        .badge-warn { background: rgba(248, 113, 113, 0.12); color: #fecaca; border: 1px solid rgba(248, 113, 113, 0.7); }
+        .status-text { font-size: 0.75rem; margin-top: 0.35rem; color: #9ca3af; }
+        .file-list { margin-top: 0.5rem; max-height: 120px; overflow-y: auto; font-size: 0.78rem; color: #e5e7eb; }
+        .file-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.1rem 0;
+        }
+        .file-row span { flex: 1; }
+        .file-delete {
+            border: none;
+            background: transparent;
+            color: #f87171;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        .file-delete:hover { color: #fecaca; }
+        .index-status { font-size: 0.78rem; color: #9ca3af; margin-top: 0.35rem; }
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem 1.75rem;
+            gap: 1.25rem;
+            min-width: 0;
+        }
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.9rem 1.25rem;
+            border-bottom: 1px solid rgba(229, 231, 235, 0.15);
+            background: rgba(15, 23, 42, 0.96);
+        }
+        .chat-title {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        .chat-title h1 {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .chat-title span {
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+        .pipeline-bar {
+            padding: 0.6rem 1.25rem 0.3rem;
+        }
+        .pipeline {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            font-size: 0.75rem;
+        }
+        .pipe-node {
+            padding: 0.35rem 0.55rem;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(55, 65, 81, 0.9);
+            color: #9ca3af;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            cursor: default;
+        }
+        .pipe-node.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.9);
+            color: #e5e7eb;
+        }
+        .pipe-node.verified-active {
+            background: rgba(22, 163, 74, 0.22);
+            border-color: rgba(22, 163, 74, 0.9);
+            color: #e5e7eb;
+        }
+        .pipe-arrow {
+            color: #6b7280;
+        }
+        .mode-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.8rem;
+        }
+        .mode-row select {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.6);
+            border-radius: 0.5rem;
+            color: #e5e7eb;
+            padding: 0.3rem 0.7rem;
+            font-size: 0.8rem;
+        }
+        .developer-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+        .toggle {
+            width: 32px;
+            height: 18px;
+            border-radius: 999px;
+            background: rgba(31, 41, 55, 0.95);
+            border: 1px solid rgba(75, 85, 99, 0.9);
+            position: relative;
+            cursor: pointer;
+        }
+        .toggle-thumb {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            background: #9ca3af;
+            transition: transform 0.15s, background 0.15s;
+        }
+        .toggle.on {
+            background: rgba(59, 130, 246, 0.22);
+            border-color: rgba(59, 130, 246, 0.9);
+        }
+        .toggle.on .toggle-thumb {
+            transform: translateX(12px);
+            background: #bfdbfe;
+        }
+
+        .chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            min-width: 0;
+        }
+        .chat-window {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+        .chat-inner {
+            max-width: 768px; /* ~max-w-3xl */
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem; /* tighter so multiple Q&A fit on screen */
+        }
+        .message-wrapper {
+            display: flex;
+            flex-direction: column;
+        }
+        .message {
+            max-width: 78%;
+            padding: 0.6rem 0.9rem;
+            border-radius: 0.9rem;
+            font-size: 0.86rem;
+            line-height: 1.45;
+        }
+        .message.user {
+            align-self: flex-end;
+            background: #3b82f6;
+            color: #f9fafb;
+            border-radius: 1rem 1rem 0.25rem 1rem;
+        }
+        .message.assistant {
+            align-self: flex-start;
+            background: #020617;
+            color: #e5e7eb;
+            border-radius: 1rem 1rem 1rem 0.25rem;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(30, 64, 175, 0.7);
+        }
+        .msg-meta {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.35rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .msg-segment {
+            margin-top: 0.35rem;
+            font-size: 0.8rem;
+        }
+        .dev-segment {
+            width: 100%;
+        }
+        .dev-segment details {
+            background: #0f172a;
+            border-radius: 0.75rem;
+            border: 1px solid #1f2937;
+            padding: 0.6rem 0.75rem;
+        }
+        .dev-segment summary {
+            cursor: pointer;
+        }
+        .dev-segment pre {
+            max-height: 260px;
+            overflow: auto;
+        }
+        .toggle-buttons {
+            display: flex;
+            gap: 0.4rem;
+            margin-bottom: 0.35rem;
+        }
+        .pill-btn {
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            font-size: 0.7rem;
+            color: #4b5563;
+            cursor: pointer;
+            transition: background 0.1s, color 0.1s, border-color 0.1s;
+        }
+        .pill-btn:hover {
+            background: #e5e7eb;
+            border-color: #9ca3af;
+        }
+        .segment-box {
+            background: #020617;
+            border-radius: 0.75rem;
+            padding: 0.6rem 0.8rem;
+            border: 1px solid rgba(30, 64, 175, 0.7);
+        }
+        .trust-summary {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 0.35rem;
+        }
+
+        .chat-input {
+            border-top: 1px solid rgba(30, 64, 175, 0.7);
+            background: #020617;
+            padding: 0.75rem 1.25rem;
+            box-shadow: 0 -1px 8px rgba(15, 23, 42, 0.85);
+        }
+        .input-row {
+            display: flex;
+            gap: 0.6rem;
+            max-width: 768px;
+            margin: 0 auto;
+        }
+        .input-row textarea {
+            flex: 1;
+            resize: none;
+            border-radius: 0.9rem;
+            border: 1px solid rgba(148, 163, 184, 0.6);
+            padding: 0.7rem 0.9rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            min-height: 52px;
+            max-height: 100px;
+            background: rgba(15, 23, 42, 0.96);
+            color: #e5e7eb;
+            outline: none;
+        }
+        .input-row textarea:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
+        }
+
+        .mode-question-overlay {
+            /* Overlay disabled to keep chat and evaluation visually separate. Mode is chosen via dropdown only. */
+            display: none;
+        }
+        .mode-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+        .mode-btn {
+            min-width: 150px;
+            padding: 0.6rem 0.8rem;
+            border-radius: 0.7rem;
+            border: 1px solid rgba(55, 65, 81, 0.9);
+            background: rgba(15, 23, 42, 0.95);
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: #e5e7eb;
+            transition: transform 0.1s, box-shadow 0.1s, border-color 0.1s, background 0.1s;
+        }
+        .mode-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(31, 41, 55, 0.8);
+            border-color: rgba(59, 130, 246, 0.9);
+        }
+        .mode-btn span { display: block; font-size: 0.72rem; color: #9ca3af; margin-top: 0.2rem; }
+        .eval-summary h3 {
+            font-size: 0.9rem;
+            margin-bottom: 0.3rem;
+            color: #e5e7eb;
+        }
+        .eval-summary p {
+            font-size: 0.8rem;
+            margin: 0.12rem 0;
+            color: #d1d5db;
+        }
+        .eval-charts {
+            margin-top: 0.75rem;
+            display: none;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+        }
+        .eval-chart h3 {
+            font-size: 0.8rem;
+            margin-bottom: 0.25rem;
+            color: #e5e7eb;
+        }
+        .eval-chart img {
+            width: 100%;
+            border-radius: 0.6rem;
+            background: #020617;
+            border: 1px solid rgba(30, 64, 175, 0.7);
+        }
+        @media (min-width: 900px) {
+            .eval-charts {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 900px) {
+            .page {
+                flex-direction: column;
+                height: auto;
+                overflow: visible;
+            }
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+            .main {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <aside class="sidebar">
+            <div class="logo">
+                <span>Adaptive Verified RAG Chatbot</span>
+                <span>Hallucination-aware, mode-selectable RAG.</span>
+            </div>
+
+            <div>
+                <div class="section-title">Documents</div>
+                <div class="card">
+                    <div id="uploadZone" class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                        <input id="fileInput" type="file" multiple accept=".pdf,.txt,.md,.csv" />
+                        <strong>Drop files or click to upload</strong>
+                        <span>PDF, TXT, MD, CSV · local only</span>
+                    </div>
+                    <button class="btn" id="uploadBtn" type="button" style="margin-top:0.5rem; width:100%;" onclick="uploadFiles()">Upload</button>
+                    <div class="status-text" id="uploadStatus">No files uploaded yet.</div>
+                    <div class="file-list" id="fileList"></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">Index</div>
+                <div class="card">
+                    <button class="btn secondary" id="rebuildBtn" type="button" onclick="runIndex()">Rebuild index</button>
+                    <div class="index-status" id="indexStatus">Index not built.</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">Mode & Tools</div>
+                <div class="card">
+                    <div class="developer-toggle">
+                        <div id="devToggle" class="toggle" onclick="toggleDeveloperMode()"><div class="toggle-thumb"></div></div>
+                        <span>Developer mode (show raw details)</span>
+                    </div>
+                    <div class="status-text" style="margin-top:0.35rem;">
+                        Choose answering mode in chat (single mode only).
+                    </div>
+                    <div class="developer-toggle" style="margin-top:0.6rem;">
+                        <div id="evalToggle" class="toggle" onclick="toggleEvaluationMode()"><div class="toggle-thumb"></div></div>
+                        <span>Evaluation Mode (per-question · all 3 modes)</span>
+                    </div>
+                    <div class="status-text" style="margin-top:0.35rem;">
+                        When enabled, every chat question runs Naive, Standard RAG, and Verified RAG in parallel. Only the verified answer is shown; metrics accumulate in the Evaluation panel below.
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="chat-header">
+                <div class="chat-title">
+                    <h1>Adaptive Verified RAG Chatbot</h1>
+                    <span>Compare naive, RAG, and verified answers.</span>
+                </div>
+                <div class="mode-row">
+                    <div id="modeBadge" class="badge badge-verified">🟩 Verified RAG</div>
+                    <select id="modeSelect" onchange="onModeDropdownChange()">
+                        <option value="verified">Verified RAG (recommended)</option>
+                        <option value="fast">Fast RAG (no verification)</option>
+                        <option value="standard">Standard RAG</option>
+                        <option value="naive">Naive LLM</option>
+                    </select>
+                </div>
+            </header>
+
+            <section class="pipeline-bar">
+                <div class="pipeline" id="pipelineView">
+                    <!-- Nodes will be highlighted based on mode -->
+                    <div class="pipe-node" data-node="user">User</div>
+                    <span class="pipe-arrow">→</span>
+                    <div class="pipe-node" data-node="retriever">Hybrid Retriever</div>
+                    <span class="pipe-arrow">→</span>
+                    <div class="pipe-node" data-node="reranker">Reranker</div>
+                    <span class="pipe-arrow">→</span>
+                    <div class="pipe-node" data-node="generator">Generator</div>
+                    <span class="pipe-arrow">→</span>
+                    <div class="pipe-node" data-node="decomposer">Claim Decomposer</div>
+                    <span class="pipe-arrow">→</span>
+                    <div class="pipe-node" data-node="verifier">Verifier</div>
+                    <span class="pipe-arrow">→</span>
+                    <div class="pipe-node" data-node="confidence">Confidence Engine</div>
+                    <span class="pipe-arrow">→</span>
+                    <div class="pipe-node" data-node="output">Trust Report</div>
+                </div>
+            </section>
+
+            <section class="chat">
+                <div style="position: relative; flex: 1; min-height: 0;">
+                    <div id="modeOverlay" class="mode-question-overlay">
+                        <div>
+                            <div class="section-title">Answering style</div>
+                            <p style="font-size:0.9rem; color:#e5e7eb; margin-bottom:0.4rem;">How would you like me to answer?</p>
+                            <p style="font-size:0.82rem; color:#9ca3af;">You can change this later from the dropdown.</p>
+                        </div>
+                        <div class="mode-buttons">
+                            <button class="mode-btn" type="button" onclick="setModeFromOverlay('naive')">
+                                🟦 Naive LLM
+                                <span>Fast, not grounded in documents.</span>
+                            </button>
+                            <button class="mode-btn" type="button" onclick="setModeFromOverlay('standard')">
+                                🟨 Standard RAG
+                                <span>Uses retrieval + citations.</span>
+                            </button>
+                            <button class="mode-btn" type="button" onclick="setModeFromOverlay('verified')">
+                                🟩 Verified RAG (Recommended)
+                                <span>Full verification + confidence score.</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="chatWindow" class="chat-window">
+                        <div id="chatInner" class="chat-inner"></div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="chat-input">
+                <div class="input-row">
+                    <textarea id="chatInput" placeholder="Ask a question about your uploaded documents..."></textarea>
+                    <button class="btn" type="button" id="sendBtn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+            <!-- Separate evaluation visually from the chat answers -->
+            <section class="card" style="margin-top:1.5rem; max-width:768px; margin-left:auto; margin-right:auto;">
+                <details id="evaluationDetails">
+                    <summary style="cursor:pointer; font-size:0.85rem;">Evaluation &amp; Mode Comparison</summary>
+                    <div style="margin-top:0.65rem;">
+                        <div class="section-title" style="margin-bottom:0.35rem;">Bulk evaluation (same-question matrix)</div>
+                        <p style="font-size:0.8rem; color:#9ca3af; margin-bottom:0.4rem;">You can paste either a numbered list (1., 2., 3., …) or write one question per line. Each question is run through Naive, Standard RAG, and Verified RAG; report is generated automatically below.</p>
+                        <textarea id="bulkQuestions" placeholder="e.g. What are the top 5 salaries in IT?&#10;What is the average experience level?&#10;(one question per line or numbered list)" style="width:100%; min-height:100px; padding:0.5rem; border-radius:0.5rem; border:1px solid rgba(148,163,184,0.5); background:rgba(15,23,42,0.9); color:#e5e7eb; font-size:0.8rem; resize:vertical;"></textarea>
+                        <div style="display:flex; gap:0.5rem; margin-top:0.4rem; flex-wrap:wrap;">
+                            <button class="btn" type="button" id="bulkEvalBtn" onclick="runBulkEvaluation()">Run bulk evaluation — auto-report below</button>
+                            <button class="btn secondary" type="button" id="bulkFromChatBtn" onclick="loadQuestionsFromChat()">Use last chat questions</button>
+                        </div>
+                        <div class="status-text" id="bulkEvalStatus" style="margin-top:0.35rem;"></div>
+                        <hr style="border:none; border-top:1px solid rgba(148,163,184,0.3); margin:0.85rem 0 0.5rem;" />
+                        <button class="btn secondary" type="button" id="evalReportBtn" onclick="generateEvaluationReport()">Generate Evaluation Report</button>
+                        <div class="status-text" id="evalReportStatus" style="margin-top:0.45rem;">
+                            Or run bulk evaluation above, or enable Evaluation Mode and ask questions in chat.
+                        </div>
+                        <div id="evalSummaryPanel" class="eval-summary" style="display:none; margin-top:0.75rem;">
+                            <h3>Evaluation Summary</h3>
+                            <p>Total Questions Evaluated: <span id="sumTotalQuestions">0</span></p>
+                            <p>Total Claims Processed: <span id="sumTotalClaims">0</span></p>
+                            <div style="margin-top:0.35rem;">
+                                <p>Hallucination Rate:</p>
+                                <p>Naive: <span id="sumHallNaive">—</span></p>
+                                <p>Standard RAG: <span id="sumHallRag">—</span></p>
+                                <p>Verified RAG: <span id="sumHallVerified">—</span></p>
+                            </div>
+                            <p style="margin-top:0.35rem;">
+                                Verified RAG reduced hallucination rate by
+                                <span id="sumImprovementNaive">—</span> compared to Naive
+                                and <span id="sumImprovementStandard">—</span> compared to Standard RAG.
+                            </p>
+                            <div style="margin-top:0.35rem;">
+                                <p>Refusal Rate:</p>
+                                <p>Naive: <span id="sumRefNaive">—</span></p>
+                                <p>Standard RAG: <span id="sumRefRag">—</span></p>
+                                <p>Verified RAG: <span id="sumRefVerified">—</span></p>
+                            </div>
+                            <div style="margin-top:0.35rem;">
+                                <p>Average Confidence:</p>
+                                <p>Naive: <span id="sumConfNaive">—</span></p>
+                                <p>Standard RAG: <span id="sumConfRag">—</span></p>
+                                <p>Verified RAG: <span id="sumConfVerified">—</span></p>
+                            </div>
+                            <p style="margin-top:0.35rem;">
+                                Conclusion: Verified RAG demonstrates measurable hallucination reduction
+                                through claim-level verification and structured refusal.
+                            </p>
+                        </div>
+                        <div id="evalCharts" class="eval-charts">
+                            <div class="eval-chart">
+                                <h3>Hallucination Rate (Naive vs Standard vs Verified)</h3>
+                                <img id="chartHallucination" alt="Hallucination rate chart" />
+                            </div>
+                            <div class="eval-chart">
+                                <h3>Refusal Rate</h3>
+                                <img id="chartRefusal" alt="Refusal rate chart" />
+                            </div>
+                            <div class="eval-chart">
+                                <h3>Supported Claim Precision</h3>
+                                <img id="chartPrecision" alt="Supported claim precision chart" />
+                            </div>
+                            <div class="eval-chart">
+                                <h3>Average Confidence</h3>
+                                <img id="chartConfidence" alt="Average confidence chart" />
+                            </div>
+                            <div class="eval-chart">
+                                <h3>Average Latency</h3>
+                                <img id="chartLatency" alt="Average latency chart" />
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const fileListEl = document.getElementById('fileList');
+        const indexStatus = document.getElementById('indexStatus');
+        const chatWindow = document.getElementById('chatWindow');
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const modeBadge = document.getElementById('modeBadge');
+        const modeSelect = document.getElementById('modeSelect');
+        const modeOverlay = document.getElementById('modeOverlay');
+        const pipelineView = document.getElementById('pipelineView');
+        const devToggle = document.getElementById('devToggle');
+        const evalToggle = document.getElementById('evalToggle');
+
+        let currentMode = 'verified'; // 'naive' | 'standard' | 'verified'
+        let developerMode = false;
+        let evaluationMode = false;
+        const messages = [];
+
+        fileInput.addEventListener('change', () => {
+            const n = fileInput.files.length;
+            if (!n) {
+                uploadStatus.textContent = 'No files selected.';
+                // Keep existing list from storage; don't clear
+                return;
+            }
+            uploadStatus.textContent = `${n} file(s) selected. Click Upload to send.`;
+            fileListEl.innerHTML = '';
+            for (const f of fileInput.files) {
+                const row = document.createElement('div');
+                row.className = 'file-row';
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = f.name;
+                row.appendChild(nameSpan);
+                fileListEl.appendChild(row);
+            }
+        });
+
+        async function uploadFiles() {
+            if (!fileInput.files.length) {
+                uploadStatus.textContent = 'Select files first.';
+                return;
+            }
+            uploadStatus.textContent = 'Uploading...';
+            const form = new FormData();
+            for (const f of fileInput.files) form.append('files', f);
+            try {
+                const r = await fetch('/api/upload', { method: 'POST', body: form });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || 'Upload failed');
+                uploadStatus.textContent = `Uploaded: ${(d.uploaded || []).join(', ')}`;
+                // Refresh status
+                await loadStatus();
+            } catch (e) {
+                uploadStatus.textContent = e.message;
+            }
+        }
+
+        async function runIndex() {
+            indexStatus.textContent = 'Rebuilding index... (1–2 min)';
+            try {
+                const r = await fetch('/api/index', { method: 'POST' });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || 'Index failed');
+                indexStatus.textContent = `${d.message || 'Done.'} — ${d.chunks || 0} chunks indexed.`;
+            } catch (e) {
+                indexStatus.textContent = e.message;
+            }
+        }
+
+        async function loadStatus() {
+            try {
+                const r = await fetch('/api/status');
+                const d = await r.json();
+                const files = d.documents || [];
+                if (files.length) {
+                    fileListEl.innerHTML = '';
+                    files.forEach((name) => {
+                        const row = document.createElement('div');
+                        row.className = 'file-row';
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = name;
+                        row.appendChild(nameSpan);
+                        const delBtn = document.createElement('button');
+                        delBtn.className = 'file-delete';
+                        delBtn.textContent = '✕';
+                        delBtn.title = 'Delete file';
+                        delBtn.onclick = () => deleteFile(name);
+                        row.appendChild(delBtn);
+                        fileListEl.appendChild(row);
+                    });
+                    uploadStatus.textContent = `${files.length} file(s) available.`;
+                } else {
+                    uploadStatus.textContent = 'No files uploaded yet.';
+                    fileListEl.innerHTML = '';
+                }
+                if (d.index_exists) {
+                    const count = typeof d.chunk_count === 'number' ? d.chunk_count : 0;
+                    indexStatus.textContent = `Index ready (${count} chunks). You can ask questions.`;
+                } else {
+                    indexStatus.textContent = 'Index not built. Rebuild after uploading documents.';
+                }
+            } catch {
+                // ignore
+            }
+        }
+
+        async function deleteFile(name) {
+            if (!confirm(`Delete "${name}" from library?`)) return;
+            try {
+                const r = await fetch(`/api/file/${encodeURIComponent(name)}`, { method: 'DELETE' });
+                if (!r.ok) {
+                    const d = await r.json().catch(() => ({}));
+                    throw new Error(d.detail || 'Delete failed');
+                }
+                await loadStatus();
+            } catch (e) {
+                uploadStatus.textContent = e.message;
+            }
+        }
+
+        function updatePipelineHighlight() {
+            const nodes = pipelineView.querySelectorAll('.pipe-node');
+            nodes.forEach((n) => {
+                n.classList.remove('active', 'verified-active');
+            });
+            // User is always active
+            pipelineView.querySelector('[data-node="user"]').classList.add('active');
+
+            if (currentMode === 'naive') {
+                pipelineView.querySelector('[data-node="output"]').classList.add('active');
+            } else if (currentMode === 'standard') {
+                ['retriever', 'reranker', 'generator', 'output'].forEach((id) => {
+                    const node = pipelineView.querySelector(`[data-node="${id}"]`);
+                    if (node) node.classList.add('active');
+                });
+            } else {
+                ['retriever', 'reranker', 'generator', 'decomposer', 'verifier', 'confidence', 'output'].forEach((id) => {
+                    const node = pipelineView.querySelector(`[data-node="${id}"]`);
+                    if (node) node.classList.add('verified-active');
+                });
+            }
+        }
+
+        function updateModeBadge() {
+            modeBadge.className = 'badge';
+            if (currentMode === 'naive') {
+                modeBadge.classList.add('badge-naive');
+                modeBadge.textContent = '🟦 Naive';
+                modeSelect.value = 'naive';
+            } else if (currentMode === 'fast') {
+                modeBadge.classList.add('badge-rag');
+                modeBadge.textContent = '🟨 Fast RAG';
+                modeSelect.value = 'fast';
+            } else if (currentMode === 'standard') {
+                modeBadge.classList.add('badge-rag');
+                modeBadge.textContent = '🟨 Standard RAG';
+                modeSelect.value = 'standard';
+            } else {
+                modeBadge.classList.add('badge-verified');
+                modeBadge.textContent = '🟩 Verified RAG';
+                modeSelect.value = 'verified';
+            }
+            updatePipelineHighlight();
+        }
+
+        function setModeFromOverlay(mode) {
+            currentMode = mode === 'standard' ? 'standard' : mode === 'naive' ? 'naive' : mode === 'fast' ? 'fast' : 'verified';
+            modeOverlay.style.display = 'none';
+            updateModeBadge();
+        }
+
+        function onModeDropdownChange() {
+            const v = modeSelect.value;
+            currentMode = v === 'naive' ? 'naive' : v === 'standard' ? 'standard' : v === 'fast' ? 'fast' : 'verified';
+            updateModeBadge();
+        }
+
+        function toggleDeveloperMode() {
+            developerMode = !developerMode;
+            devToggle.classList.toggle('on', developerMode);
+            // Just re-render messages to show/hide developer details
+            renderMessages();
+        }
+
+        function toggleEvaluationMode() {
+            evaluationMode = !evaluationMode;
+            if (evalToggle) {
+                evalToggle.classList.toggle('on', evaluationMode);
+            }
+            // When evaluation mode is on, the chat always displays the verified answer.
+            // Reflect that in the UI by switching the active mode to Verified.
+            if (evaluationMode) {
+                currentMode = 'verified';
+                updateModeBadge();
+            }
+        }
+
+        function appendMessage(role, content, meta) {
+            messages.push({ role, content, meta: meta || null });
+            renderMessages();
+        }
+
+        function renderMessages() {
+            const inner = document.getElementById('chatInner');
+            inner.innerHTML = '';
+            messages.forEach((m) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'message-wrapper';
+                wrapper.style.alignItems = m.role === 'user' ? 'flex-end' : 'flex-start';
+
+                const bubble = document.createElement('div');
+                bubble.className = 'message ' + (m.role === 'user' ? 'user' : 'assistant');
+                bubble.textContent = m.content;
+                wrapper.appendChild(bubble);
+
+                if (m.role === 'assistant' && m.meta) {
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'msg-meta';
+
+                    if (m.meta.mode === 'naive') {
+                        const badge = document.createElement('span');
+                        badge.className = 'badge badge-warn';
+                        badge.textContent = '⚠ Not grounded in documents';
+                        metaDiv.appendChild(badge);
+                    } else if (m.meta.mode === 'standard') {
+                        const span = document.createElement('span');
+                        span.textContent = 'Standard RAG · citations only';
+                        metaDiv.appendChild(span);
+                    } else if (m.meta.mode === 'verified') {
+                        const conf = (m.meta.confidence || 0) * 100;
+                        const hall = (m.meta.hallucination || 0) * 100;
+                        const trustText = document.createElement('span');
+                        trustText.className = 'trust-summary';
+                        trustText.textContent = `Confidence: ${conf.toFixed(0)}% · Hallucination risk: ${hall.toFixed(0)}%`;
+                        metaDiv.appendChild(trustText);
+                    }
+
+                    if (m.meta.totalLatency) {
+                        const lat = document.createElement('span');
+                        lat.style.fontSize = '0.7rem';
+                        lat.style.color = '#9ca3af';
+                        lat.textContent = `Latency: ${m.meta.totalLatency.toFixed(2)}s`;
+                        metaDiv.appendChild(lat);
+                    }
+
+                    wrapper.appendChild(metaDiv);
+
+                    // Verified RAG extras: claims + evidence toggles
+                    if (m.meta.mode === 'verified') {
+                        const seg = document.createElement('div');
+                        seg.className = 'msg-segment';
+
+                        const buttons = document.createElement('div');
+                        buttons.className = 'toggle-buttons';
+                        const btnClaims = document.createElement('button');
+                        btnClaims.type = 'button';
+                        btnClaims.className = 'pill-btn';
+                        btnClaims.textContent = 'View claims';
+                        const btnEvidence = document.createElement('button');
+                        btnEvidence.type = 'button';
+                        btnEvidence.className = 'pill-btn';
+                        btnEvidence.textContent = 'View evidence';
+                        buttons.appendChild(btnClaims);
+                        buttons.appendChild(btnEvidence);
+
+                        const claimsBox = document.createElement('div');
+                        claimsBox.className = 'segment-box';
+                        claimsBox.style.display = 'none';
+
+                        const claims = m.meta.claims || [];
+                        const verdicts = m.meta.verdicts || [];
+                        const evid = m.meta.evidence || [];
+                        if (claims.length) {
+                            claims.forEach((c, idx) => {
+                                const row = document.createElement('div');
+                                row.style.marginBottom = '0.25rem';
+                                const v = verdicts[idx] || '';
+                                const ev = evid[idx] || '';
+                                const color = v === 'SUPPORTED' ? '#22c55e' : v === 'CONTRADICTED' ? '#f97316' : '#eab308';
+                                row.innerHTML = `<span style="color:${color}; font-weight:600; font-size:0.76rem;">${v || 'UNVERIFIED'}</span> — ${c}`;
+                                if (ev) {
+                                    const evDiv = document.createElement('div');
+                                    evDiv.style.color = '#9ca3af';
+                                    evDiv.style.fontSize = '0.75rem';
+                                    evDiv.style.marginLeft = '0.5rem';
+                                    evDiv.textContent = `Evidence: ${ev.slice(0, 160)}${ev.length > 160 ? '…' : ''}`;
+                                    row.appendChild(evDiv);
+                                }
+                                claimsBox.appendChild(row);
+                            });
+                        } else {
+                            claimsBox.textContent = 'No decomposed claims.';
+                        }
+
+                        const evidenceBox = document.createElement('div');
+                        evidenceBox.className = 'segment-box';
+                        evidenceBox.style.display = 'none';
+
+                        const evChunks = m.meta.evidence || [];
+                        if (evChunks.length) {
+                            evChunks.forEach((chunk, idx) => {
+                                const row = document.createElement('div');
+                                row.style.marginBottom = '0.25rem';
+                                row.innerHTML = `<strong>[${idx + 1}]</strong> ${chunk.slice(0, 200)}${chunk.length > 200 ? '…' : ''}`;
+                                evidenceBox.appendChild(row);
+                            });
+                        } else {
+                            evidenceBox.textContent = 'No evidence chunks returned.';
+                        }
+
+                        btnClaims.onclick = () => {
+                            claimsBox.style.display = claimsBox.style.display === 'none' ? 'block' : 'none';
+                        };
+                        btnEvidence.onclick = () => {
+                            evidenceBox.style.display = evidenceBox.style.display === 'none' ? 'block' : 'none';
+                        };
+
+                        seg.appendChild(buttons);
+                        seg.appendChild(claimsBox);
+                        seg.appendChild(evidenceBox);
+                        wrapper.appendChild(seg);
+                    }
+
+                    // Evidence segment for standard RAG
+                    if (m.meta.mode === 'standard') {
+                        const segEv = document.createElement('div');
+                        segEv.className = 'msg-segment';
+                        const buttons = document.createElement('div');
+                        buttons.className = 'toggle-buttons';
+                        const btnEvidence = document.createElement('button');
+                        btnEvidence.type = 'button';
+                        btnEvidence.className = 'pill-btn';
+                        btnEvidence.textContent = 'View evidence';
+                        buttons.appendChild(btnEvidence);
+
+                        const box = document.createElement('div');
+                        box.className = 'segment-box';
+                        box.style.display = 'none';
+                        const evChunks = m.meta.evidence || [];
+                        if (evChunks.length) {
+                            evChunks.forEach((chunk, idx) => {
+                                const row = document.createElement('div');
+                                row.style.marginBottom = '0.25rem';
+                                row.innerHTML = `<strong>[${idx + 1}]</strong> ${chunk.slice(0, 200)}${chunk.length > 200 ? '…' : ''}`;
+                                box.appendChild(row);
+                            });
+                        } else {
+                            box.textContent = 'No evidence chunks returned.';
+                        }
+                        btnEvidence.onclick = () => {
+                            box.style.display = box.style.display === 'none' ? 'block' : 'none';
+                        };
+                        segEv.appendChild(buttons);
+                        segEv.appendChild(box);
+                        wrapper.appendChild(segEv);
+                    }
+
+                    // Developer details
+                    if (developerMode && m.meta.raw) {
+                        const segDev = document.createElement('div');
+                        segDev.className = 'msg-segment dev-segment';
+                        segDev.style.alignSelf = 'stretch';
+                        const detDev = document.createElement('details');
+                        const sumDev = document.createElement('summary');
+                        sumDev.textContent = 'Developer details (raw JSON)';
+                        detDev.appendChild(sumDev);
+                        const pre = document.createElement('pre');
+                        pre.style.marginTop = '0.3rem';
+                        pre.style.fontFamily = '"JetBrains Mono", monospace';
+                        pre.style.fontSize = '0.7rem';
+                        pre.textContent = JSON.stringify(m.meta.raw, null, 2);
+                        detDev.appendChild(pre);
+                        segDev.appendChild(detDev);
+                        wrapper.appendChild(segDev);
+                    }
+                }
+
+                inner.appendChild(wrapper);
+            });
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            appendMessage('user', text);
+            chatInput.value = '';
+            await queryBackend(text);
+        }
+
+        async function queryBackend(text) {
+            sendBtn.disabled = true;
+            try {
+                const modeForApi =
+                    currentMode === 'naive'
+                        ? 'naive'
+                        : currentMode === 'standard'
+                        ? 'rag'
+                        : currentMode === 'fast'
+                        ? 'fast'
+                        : 'multi';
+                const r = await fetch('/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: text, mode: modeForApi, evaluation_mode: evaluationMode })
+                });
+                const d = await r.json();
+                const status = d.status || (modeForApi === 'naive' ? 'naive' : modeForApi === 'rag' ? 'rag' : 'multi');
+                const modeMeta = status === 'naive' ? 'naive' : status === 'rag' ? 'standard' : 'verified';
+                const conf = d.confidence_score || 0;
+                const hall = d.hallucination_score != null ? d.hallucination_score : (1 - conf);
+                const claims = d.claims || [];
+                const verdicts = d.verdicts || [];
+                const claimEvidence = d.claim_evidence || [];
+                const evidenceFound = d.evidence_found || [];
+                const totalLatency = typeof d.total_latency === 'number' ? d.total_latency : null;
+
+                const meta = {
+                    mode: modeMeta,
+                    confidence: conf,
+                    hallucination: hall,
+                    claims,
+                    verdicts,
+                    evidence: claimEvidence.length ? claimEvidence : evidenceFound,
+                    totalLatency,
+                    raw: d,
+                };
+
+                let answerText = d.answer || d.explanation || d.refusal_reason || '(No answer text.)';
+                if (modeMeta === 'naive') {
+                    answerText += '\n\n(Warning: This answer is not grounded in your uploaded documents.)';
+                } else if (modeMeta === 'verified' && d.status === 'refused') {
+                    answerText = '⚠ Insufficient evidence\n\nThis query cannot be fully verified using the uploaded documents.\n\nYou may try uploading more relevant documents or asking a more specific question.';
+                }
+
+                appendMessage('assistant', answerText, meta);
+
+                // If Evaluation Mode is on, auto-refresh the report so metrics/graphs stay in sync.
+                if (evaluationMode) {
+                    // Fire and forget; errors are handled inside generateEvaluationReport.
+                    generateEvaluationReport();
+                }
+            } catch (e) {
+                appendMessage('assistant', 'Error calling backend: ' + e.message, null);
+            }
+            sendBtn.disabled = false;
+        }
+
+        function renderEvalReport(d) {
+            const summaryPanel = document.getElementById('evalSummaryPanel');
+            const chartsContainer = document.getElementById('evalCharts');
+            if (!d || !d.has_data) return false;
+            const perMode = d.per_mode || {};
+            const overall = d.overall || {};
+            function pct(x) {
+                if (x === null || x === undefined) return '—';
+                return (x * 100).toFixed(1) + '%';
+            }
+            function pct0(x) {
+                if (x === null || x === undefined) return '—';
+                return (x * 100).toFixed(0) + '%';
+            }
+            function num2(x) {
+                if (x === null || x === undefined) return '—';
+                return Number(x).toFixed(2);
+            }
+            const naive = perMode['Naive'] || {};
+            const rag = perMode['Standard RAG'] || {};
+            const verified = perMode['Verified RAG'] || {};
+            document.getElementById('sumTotalQuestions').textContent = overall.total_questions ?? 0;
+            document.getElementById('sumTotalClaims').textContent = overall.total_claims ?? 0;
+            document.getElementById('sumHallNaive').textContent = pct(naive.hallucination_rate);
+            document.getElementById('sumHallRag').textContent = pct(rag.hallucination_rate);
+            document.getElementById('sumHallVerified').textContent = pct(verified.hallucination_rate);
+            document.getElementById('sumRefNaive').textContent = pct(naive.refusal_rate);
+            document.getElementById('sumRefRag').textContent = pct(rag.refusal_rate);
+            document.getElementById('sumRefVerified').textContent = pct(verified.refusal_rate);
+            document.getElementById('sumConfNaive').textContent = num2(naive.average_confidence);
+            document.getElementById('sumConfRag').textContent = num2(rag.average_confidence);
+            document.getElementById('sumConfVerified').textContent = num2(verified.average_confidence);
+            const relNaive = d.relative_reduction_vs_naive;
+            const relStandard = d.relative_reduction_vs_standard;
+            document.getElementById('sumImprovementNaive').textContent = relNaive != null ? pct0(relNaive) : '—';
+            document.getElementById('sumImprovementStandard').textContent = relStandard != null ? pct0(relStandard) : '—';
+            const charts = d.charts || {};
+            function setChart(imgId, key) {
+                const img = document.getElementById(imgId);
+                if (!img) return;
+                if (charts[key]) {
+                    img.src = charts[key];
+                    img.style.display = 'block';
+                } else {
+                    img.src = '';
+                    img.style.display = 'none';
+                }
+            }
+            setChart('chartHallucination', 'hallucination_rate');
+            setChart('chartRefusal', 'refusal_rate');
+            setChart('chartPrecision', 'supported_claim_precision');
+            setChart('chartConfidence', 'average_confidence');
+            setChart('chartLatency', 'average_latency');
+            const hasCharts = charts && Object.keys(charts).length > 0;
+            chartsContainer.style.display = hasCharts ? 'grid' : 'none';
+            summaryPanel.style.display = 'block';
+            return true;
+        }
+
+        async function runBulkEvaluation() {
+            const textarea = document.getElementById('bulkQuestions');
+            const btn = document.getElementById('bulkEvalBtn');
+            const statusEl = document.getElementById('bulkEvalStatus');
+            const raw = (textarea.value || '').trim();
+
+            let questions = [];
+            if (!raw) {
+                statusEl.textContent = 'Enter at least one question.';
+                return;
+            }
+
+            // Support either numbered lists (1. Q1 2. Q2 ...) or one-question-per-line.
+            const hasNumberedPattern = /^\s*\d+[\.\)]\s+/m.test(raw);
+            if (hasNumberedPattern) {
+                questions = raw
+                    .split(/\n?\s*\d+[\.\)]\s+/)
+                    .map(q => q.trim())
+                    .filter(q => q);
+            } else {
+                questions = raw.split('\n').map(q => q.trim()).filter(q => q);
+            }
+            if (!questions.length) {
+                statusEl.textContent = 'Enter at least one question (numbered list or one per line).';
+                return;
+            }
+            btn.disabled = true;
+            statusEl.textContent = `Evaluating ${questions.length} question(s) through Naive, Standard RAG, and Verified RAG...`;
+            try {
+                const r = await fetch('/api/eval/bulk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ questions })
+                });
+                const data = await r.json();
+                if (!r.ok) {
+                    statusEl.textContent = data.detail || data.message || 'Bulk evaluation failed.';
+                    return;
+                }
+                statusEl.textContent = data.message || `Done. Processed ${data.processed}, failed ${data.failed}.`;
+                if (data.report && data.report.has_data) {
+                    renderEvalReport(data.report);
+                    document.getElementById('evaluationDetails').open = true;
+                } else if (data.report === null && data.processed === 0) {
+                    statusEl.textContent = data.message || 'No questions could be evaluated.';
+                }
+            } catch (e) {
+                statusEl.textContent = 'Error: ' + e.message;
+            }
+            btn.disabled = false;
+        }
+
+        function loadQuestionsFromChat() {
+            const textarea = document.getElementById('bulkQuestions');
+            const statusEl = document.getElementById('bulkEvalStatus');
+            const chatQuestions = messages.filter(m => m.role === 'user').map(m => m.content.trim()).filter(Boolean);
+            if (!chatQuestions.length) {
+                statusEl.textContent = 'No chat questions found yet. Ask some questions first, then try again.';
+                return;
+            }
+            const lastN = chatQuestions.slice(-20); // use up to last 20 user questions
+            textarea.value = lastN.join('\n');
+            statusEl.textContent = `Loaded ${lastN.length} question(s) from chat history. You can edit them and then run bulk evaluation.`;
+        }
+
+        async function generateEvaluationReport() {
+            const statusEl = document.getElementById('evalReportStatus');
+            const summaryPanel = document.getElementById('evalSummaryPanel');
+            const chartsContainer = document.getElementById('evalCharts');
+            statusEl.textContent = 'Generating evaluation report...';
+            summaryPanel.style.display = 'none';
+            chartsContainer.style.display = 'none';
+            try {
+                const r = await fetch('/api/eval/report');
+                const d = await r.json();
+                if (!renderEvalReport(d)) {
+                    statusEl.textContent = d.message || 'No evaluation data yet. Run bulk evaluation or enable Evaluation Mode.';
+                    return;
+                }
+                statusEl.textContent = 'Evaluation report generated from current session.';
+            } catch (e) {
+                statusEl.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        // Initial load
+        loadStatus().then(() => {
+            // If we want to remember mode across reloads, we could use localStorage;
+            // for now we always ask via overlay.
+            updatePipelineHighlight();
+        });
+    </script>
+</body>
+</html>
+
