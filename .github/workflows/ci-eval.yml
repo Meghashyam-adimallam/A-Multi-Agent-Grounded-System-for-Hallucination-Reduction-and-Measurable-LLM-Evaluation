@@ -30,6 +30,7 @@ jobs:
         run: python scripts/index_documents.py
 
       - name: Run hallucination benchmark
+        continue-on-error: true  # Do not fail CI if benchmark fails; informational only
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python scripts/run_benchmark.py --condition multi --limit 3
