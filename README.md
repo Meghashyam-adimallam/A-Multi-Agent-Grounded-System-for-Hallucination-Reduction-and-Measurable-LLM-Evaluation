@@ -1,7 +1,7 @@
 A Multi-Agent Grounded System for Hallucination Reduction and Measurable LLM Evaluation
-with 
-with e Verified RAG & Evaluation Platform_
-with 
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat&logo=pytorch&logoColor=white) ![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=flat&logo=langchain&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
+
 Recruiter-ready project that turns a hallucination‑resistant RAG chatbot into a **measurement platform**.  
 It runs the same questions through **Naive LLM, Standard RAG, Fast RAG, and Verified RAG**, stores all runs, and generates **comparative graphs** showing how much hallucination Verified RAG removes.
 
