@@ -11,11 +11,11 @@ For every question and mode, it quantifies **hallucination rate, supported‑cla
 On our LLM‑evaluation example, **Verified RAG achieved zero hallucinated claims**, while Naive and Standard RAG still hallucinated a significant fraction of their outputs.  
 The result is a chatbot that doubles as a **hallucination evaluation and explanation tool**, not just a demo UI.
 
-## Tech Stack
+## 🔧 Tech Stack
 
 **Python** · **PyTorch** · LangChain · sentence-transformers (DeBERTa-v3) · FAISS · BM25 · FastAPI · minimal chat UI
 
-## What this project demonstrates
+## ✨ What this project demonstrates
 
 - **Multi‑mode answering**
   - **Fast RAG** — retrieve → rerank → answer (no verification; GPT‑style UX).
@@ -33,14 +33,14 @@ The result is a chatbot that doubles as a **hallucination evaluation and explana
   - Latest aggregate report in `storage/evaluation_report_latest.json`.
   - Charts saved as PNGs in `storage/eval_charts/` (ready for slides/resume).
 
-## Why this matters
+## 💡 Why this matters
 
 - **Hallucination is a major deployment risk** for LLM applications in production (legal, medical, financial, etc.).  
 - **Standard RAG helps, but does not eliminate hallucinations** – many answers are still partially unsupported.  
 - **Verified RAG introduces claim‑level verification** (via NLI + confidence threshold) and structured refusal.  
 - This project makes hallucination reduction **measurable and visual**, so teams can justify using safer pipelines.
 
-## Metrics we track (per mode)
+## 📊 Metrics we track (per mode)
 
 For each mode (Naive, Standard RAG, Verified RAG, Fast RAG), the platform aggregates:
 
@@ -55,7 +55,7 @@ The UI renders these as bar charts and an “Evaluation Summary” panel so you 
 
 > “Verified RAG reduced hallucination rate by 65% vs Naive and 35% vs Standard RAG on my dataset.”
 
-## Example evaluation results (LLM eval PDF, 1 question)
+## 📈 Example evaluation results (LLM eval PDF, 1 question)
 
 This is an example run on a single “LLM app evaluation” PDF question (58 claims total).  
 You can re‑run bulk evaluation with more questions to update these numbers.
@@ -68,7 +68,7 @@ You can re‑run bulk evaluation with more questions to update these numbers.
 
 **Conclusion:** On this evaluation example, Verified RAG eliminates hallucinated claims while increasing precision and confidence, and it is actually faster than both Naive and Standard RAG due to the optimized pipeline.
 
-## Architecture (high level)
+## 🏗️ Architecture (high level)
 
 ```
 Query → [1] Retriever (Hybrid BM25 + Dense) → [2] Reranker → [3] Answer Generator
@@ -83,7 +83,7 @@ Query → [1] Retriever (Hybrid BM25 + Dense) → [2] Reranker → [3] Answer Ge
 - **Verification**: NLI model (DeBERTa‑v3) per claim + cosine similarity.
 - **Confidence**: support ratio; may re‑retrieve (for Verified RAG) or refuse.
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 Multi_Hybrid_Rag/
@@ -104,7 +104,7 @@ Multi_Hybrid_Rag/
 └── .github/workflows/  # CI evaluation gate
 ```
 
-## Setup (local, Windows friendly)
+## 🚀 Setup (local, Windows friendly)
 
 **Important:** Use a fresh venv to avoid PyTorch conflicts with global packages.
 
@@ -126,7 +126,7 @@ copy .env.example .env
 # Edit .env: add OPENAI_API_KEY
 ```
 
-## Run the web app
+## ▶️ Run the web app
 
 ```powershell
 cd Multi_Hybrid_Rag
@@ -139,7 +139,7 @@ Then open the **chat UI**:
 - Chatbot: `http://127.0.0.1:8001/chat`
 - Step‑by‑step app: `http://127.0.0.1:8001/app`
 
-### Upload & index documents
+### 📤 Upload & index documents
 
 - Supported types: **PDF, TXT, MD, CSV**.
 - In `/chat` or `/app`:
@@ -147,7 +147,7 @@ Then open the **chat UI**:
   2. Click **Upload**.
   3. Click **Rebuild index** once. It should say: `Index ready (… chunks).`
 
-### Use the chatbot
+### 💬 Use the chatbot
 
 - **Choose answering mode** (header dropdown):
   - `Fast RAG (no verification)` — best UX speed.
@@ -156,7 +156,7 @@ Then open the **chat UI**:
   - `Naive LLM` — baseline.
 - Ask a question in the bottom input box → answer appears in a dark bubble.
 
-### Run evaluation from the UI
+### 📋 Run evaluation from the UI
 
 There are **two** ways to build metrics:
 
@@ -178,12 +178,12 @@ There are **two** ways to build metrics:
       - `storage/evaluation_report_latest.json`
       - `storage/eval_charts/*.png`
 
-## Extensibility & Optional Integrations
+## 🔌 Extensibility & Optional Integrations
 
 - **Langfuse observability** — set `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` in `.env` to trace each agent’s latency.
 - **GitHub Actions / CI** — you can wire `storage/evaluation_report_latest.json` into a CI check that blocks merges when hallucination rate worsens.
 
-## UI Preview
+## 🖼️ UI Preview
 
 ![Chat UI](docs/ui-chat.png)  
 *Adaptive Verified RAG Chatbot with mode selector (Fast / Standard / Verified / Naive) and a verified answer vs refusal example.*
@@ -193,7 +193,7 @@ There are **two** ways to build metrics:
 
 *Add your own screenshots: place `ui-chat.png` in `docs/` and run bulk evaluation to generate charts in `storage/eval_charts/`.*
 
-## Contributors
+## 👥 Contributors
 
 - **Achuth Reddy**  
   - Designed and implemented the **multi‑agent RAG pipeline** (retriever, reranker, generator, decomposer, verifier, confidence agent).  
@@ -205,7 +205,7 @@ There are **two** ways to build metrics:
   - Implemented the **Evaluation Mode** and **Bulk evaluation** UX, including auto‑updating metrics and graphs.  
   - Wrote and refined the **project README**, selected evaluation PDFs/questions, and ran experiments to generate the final metrics and visualizations.
 
-## Tests
+## 🧪 Tests
 
 ```powershell
 pip install pytest
