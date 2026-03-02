@@ -2,14 +2,7 @@ A Multi-Agent Grounded System for Hallucination Reduction and Measurable LLM Eva
 
 ![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat&logo=pytorch&logoColor=white) ![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=flat&logo=langchain&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
 
-Recruiter-ready project that turns a hallucination‑resistant RAG chatbot into a **measurement platform**.  
-It runs the same questions through **Naive LLM, Standard RAG, Fast RAG, and Verified RAG**, stores all runs, and generates **comparative graphs** showing how much hallucination Verified RAG removes.
-
-This project builds a **multi-agent grounded RAG system** focused on reducing hallucinations in LLM responses.  
-Instead of just answering questions, it **compares multiple modes side‑by‑side** (Naive, Standard RAG, Verified RAG) on the same evaluation set.  
-For every question and mode, it quantifies **hallucination rate, supported‑claim precision, confidence, and latency**, and visualizes them as charts.  
-On our LLM‑evaluation example, **Verified RAG achieved zero hallucinated claims**, while Naive and Standard RAG still hallucinated a significant fraction of their outputs.  
-The result is a chatbot that doubles as a **hallucination evaluation and explanation tool**, not just a demo UI.
+Multi-agent grounded RAG system that reduces hallucinations and **measures** the improvement. Runs the same questions through **Naive LLM, Standard RAG, Fast RAG, and Verified RAG**, stores all runs, and generates **comparative graphs**. On our evaluation, **Verified RAG achieved zero hallucinated claims** vs 50% for Naive and 32% for Standard RAG.
 
 ## 🔧 Tech Stack
 
@@ -28,45 +21,25 @@ The result is a chatbot that doubles as a **hallucination evaluation and explana
 - **Bulk evaluation**
   - Paste 10–50 questions at once.
   - The system runs Naive/Standard/Verified for each question and **auto‑builds a report**.
-- **Persistent results**
-  - All runs saved to `storage/evaluation_log.json`.
-  - Latest aggregate report in `storage/evaluation_report_latest.json`.
-  - Charts saved as PNGs in `storage/eval_charts/` (ready for slides/resume).
+- **Persistent results** → `storage/evaluation_log.json`, `storage/eval_charts/*.png`
 
 ## 💡 Why this matters
 
-- **Hallucination is a major deployment risk** for LLM applications in production (legal, medical, financial, etc.).  
-- **Standard RAG helps, but does not eliminate hallucinations** – many answers are still partially unsupported.  
-- **Verified RAG introduces claim‑level verification** (via NLI + confidence threshold) and structured refusal.  
-- This project makes hallucination reduction **measurable and visual**, so teams can justify using safer pipelines.
+Hallucination is a major risk for LLMs in production. Standard RAG helps but doesn't eliminate it. This project adds **claim-level verification** (NLI + confidence threshold) and makes the improvement **measurable and visual**.
 
-## 📊 Metrics we track (per mode)
+## 📊 Metrics we track
 
-For each mode (Naive, Standard RAG, Verified RAG, Fast RAG), the platform aggregates:
+Per mode: **hallucination rate**, **refusal rate**, **supported-claim precision**, **average confidence**, **latency**. Rendered as bar charts in the UI.
 
-- **Hallucination rate** = unsupported claims / total claims
-- **Refusal rate** = refused questions / total questions
-- **Supported claim precision** = supported claims / total claims
-- **Average confidence**
-- **Average latency**
-- **Total claims processed**
+## 📈 Example results (1 PDF question, 58 claims)
 
-The UI renders these as bar charts and an “Evaluation Summary” panel so you can say, e.g.:
+| Mode          | Hallucination Rate | Supported Claim Precision | Avg Confidence | Avg Latency |
+|---------------|--------------------|---------------------------|----------------|-------------|
+| Naive         | 50%                | 50%                       | 0.50           | 67.5 s      |
+| Standard RAG  | 32%                | 68%                       | 0.68           | 48.7 s      |
+| Verified RAG  | **0%**             | **100%**                  | **1.00**       | 33.7 s      |
 
-> “Verified RAG reduced hallucination rate by 65% vs Naive and 35% vs Standard RAG on my dataset.”
-
-## 📈 Example evaluation results (LLM eval PDF, 1 question)
-
-This is an example run on a single “LLM app evaluation” PDF question (58 claims total).  
-You can re‑run bulk evaluation with more questions to update these numbers.
-
-| Mode          | Hallucination Rate | Supported Claim Precision | Average Confidence | Average Latency |
-|--------------|--------------------|---------------------------|--------------------|-----------------|
-| Naive        | 50%                | 50%                       | 0.50               | 67.5 s          |
-| Standard RAG | 32%                | 68%                       | 0.68               | 48.7 s          |
-| Verified RAG | **0%**             | **100%**                  | **1.00**           | 33.7 s          |
-
-**Conclusion:** On this evaluation example, Verified RAG eliminates hallucinated claims while increasing precision and confidence, and it is actually faster than both Naive and Standard RAG due to the optimized pipeline.
+Verified RAG eliminates hallucinations and is faster than both baselines.
 
 ## 🏗️ Architecture (high level)
 
@@ -76,24 +49,16 @@ Query → [1] Retriever (Hybrid BM25 + Dense) → [2] Reranker → [3] Answer Ge
      → Verified Answer OR Structured Refusal
 ```
 
-- **Hybrid retrieval**: BM25 + dense vectors + Reciprocal Rank Fusion.
-- **Reranking**: Cross‑encoder for top‑N evidence selection.
-- **Answer generation**: GPT‑3.5 with enforced citations.
-- **Claim decomposition**: atomic, independently verifiable claims.
-- **Verification**: NLI model (DeBERTa‑v3) per claim + cosine similarity.
-- **Confidence**: support ratio; may re‑retrieve (for Verified RAG) or refuse.
-
 ## 📁 Project Structure
 
 ```
-Multi_Hybrid_Rag/
 ├── config/          # Settings
 ├── src/
 │   ├── agents/      # Retriever, Reranker, Generator, Decomposer, Verifier, Confidence
 │   ├── ingestion/   # Document loaders, chunking
 │   ├── retrieval/   # BM25, dense, hybrid + RRF
 │   ├── pipeline/    # Orchestrator
-│   ├── observability/  # Langfuse tracing (optional)
+│   ├── observability/  # Optional tracing
 │   └── api/         # FastAPI
 ├── data/
 │   ├── documents/   # Input PDFs/TXT/MD
@@ -109,8 +74,7 @@ Multi_Hybrid_Rag/
 **Important:** Use a fresh venv to avoid PyTorch conflicts with global packages.
 
 ```powershell
-cd Multi_Hybrid_Rag
-
+# From project root
 # Create venv (required — avoids torch/CUDA conflicts)
 python -m venv venv
 .\venv\Scripts\Activate.ps1
@@ -129,7 +93,6 @@ copy .env.example .env
 ## ▶️ Run the web app
 
 ```powershell
-cd Multi_Hybrid_Rag
 .\venv\Scripts\Activate.ps1
 uvicorn src.api.main:app --host 127.0.0.1 --port 8001
 ```
@@ -158,40 +121,8 @@ Then open the **chat UI**:
 
 ### 📋 Run evaluation from the UI
 
-There are **two** ways to build metrics:
-
-- **Per‑question Evaluation Mode**
-  - Sidebar → toggle **Evaluation Mode (per‑question · all 3 modes)** ON.
-  - Each chat question runs **Naive, Standard RAG, Verified RAG** in parallel.
-  - The verified answer is shown; metrics accumulate in the **Evaluation & Mode Comparison** panel, which can auto‑refresh.
-
-- **Bulk evaluation (recommended for reports)**
-  - Scroll to **Evaluation & Mode Comparison**.
-  - In **Bulk evaluation**, paste 10–50 questions (one per line or as a numbered list).
-  - (Optional) Click **Use last chat questions** to load recent chat prompts into the bulk box.
-  - Click **Run bulk evaluation — auto‑report below**.
-  - When it finishes, you get:
-    - An **Evaluation Summary** with metrics per mode.
-    - Bar charts for hallucination rate, refusal rate, precision, confidence, and latency.
-    - Results saved to:
-      - `storage/evaluation_log.json`
-      - `storage/evaluation_report_latest.json`
-      - `storage/eval_charts/*.png`
-
-## 🔌 Extensibility & Optional Integrations
-
-- **Langfuse observability** — set `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` in `.env` to trace each agent’s latency.
-- **GitHub Actions / CI** — you can wire `storage/evaluation_report_latest.json` into a CI check that blocks merges when hallucination rate worsens.
-
-## 🖼️ UI Preview
-
-![Chat UI](docs/ui-chat.png)  
-*Adaptive Verified RAG Chatbot with mode selector (Fast / Standard / Verified / Naive) and a verified answer vs refusal example.*
-
-![Evaluation graphs](storage/eval_charts/hallucination_rate.png)  
-*The Evaluation & Mode Comparison panel showing hallucination rate, precision, confidence, and latency charts.*
-
-*Add your own screenshots: place `ui-chat.png` in `docs/` and run bulk evaluation to generate charts in `storage/eval_charts/`.*
+- **Per-question:** Sidebar → toggle **Evaluation Mode** ON. Each question runs all 3 modes; metrics update in **Evaluation & Mode Comparison**.
+- **Bulk (recommended):** Paste 10–50 questions → **Run bulk evaluation**. Results → `storage/evaluation_log.json`, `storage/eval_charts/*.png`
 
 ## 👥 Contributors
 
