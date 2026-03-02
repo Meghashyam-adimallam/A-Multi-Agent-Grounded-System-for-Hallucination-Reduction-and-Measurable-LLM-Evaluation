@@ -11,6 +11,10 @@ For every question and mode, it quantifies **hallucination rate, supported‑cla
 On our LLM‑evaluation example, **Verified RAG achieved zero hallucinated claims**, while Naive and Standard RAG still hallucinated a significant fraction of their outputs.  
 The result is a chatbot that doubles as a **hallucination evaluation and explanation tool**, not just a demo UI.
 
+## Tech Stack
+
+**Python** · **PyTorch** · LangChain · sentence-transformers (DeBERTa-v3) · FAISS · BM25 · FastAPI · minimal chat UI
+
 ## What this project demonstrates
 
 - **Multi‑mode answering**
@@ -179,19 +183,15 @@ There are **two** ways to build metrics:
 - **Langfuse observability** — set `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` in `.env` to trace each agent’s latency.
 - **GitHub Actions / CI** — you can wire `storage/evaluation_report_latest.json` into a CI check that blocks merges when hallucination rate worsens.
 
-## UI preview (add your screenshots)
+## UI Preview
 
-You can include 1–2 screenshots here in your own fork/clone, for example:
+![Chat UI](docs/ui-chat.png)  
+*Adaptive Verified RAG Chatbot with mode selector (Fast / Standard / Verified / Naive) and a verified answer vs refusal example.*
 
-- **Chat UI** – Adaptive Verified RAG Chatbot with mode selector (Fast / Standard / Verified / Naive) and a verified answer vs refusal example.
-- **Evaluation graphs** – The Evaluation & Mode Comparison panel showing hallucination rate, precision, confidence, and latency charts.
+![Evaluation graphs](storage/eval_charts/hallucination_rate.png)  
+*The Evaluation & Mode Comparison panel showing hallucination rate, precision, confidence, and latency charts.*
 
-Example (you can either copy a chart PNG or update the filename to match one in `storage/eval_charts/`):
-
-```markdown
-![Chat UI](docs/ui-chat.png)
-![Evaluation graphs](storage/eval_charts/hallucination_rate.png)
-```
+*Add your own screenshots: place `ui-chat.png` in `docs/` and run bulk evaluation to generate charts in `storage/eval_charts/`.*
 
 ## Contributors
 
@@ -212,7 +212,3 @@ pip install pytest
 pytest                    # Fast tests only (excludes slow/hybrid)
 pytest -m slow            # Include slow tests (requires model download)
 ```
-
-## License
-
-MIT
